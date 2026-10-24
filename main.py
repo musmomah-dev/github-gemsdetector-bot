@@ -5,15 +5,7 @@ from bs4 import BeautifulSoup
 # --- CONFIGURATION ---
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-
-# Mots-clés cibles pour ton business et tes compétences
-TARGET_KEYWORDS = [
-    "ai", "artificial intelligence", "llm", "gpt", "agent", "openai", "claude",
-    "automation", "n8n", "make", "workflow", "bot", "scraper", "scraping",
-    "api", "tool", "utility", "cli",
-    "saas", "boilerplate", "starter", "open-source", "free",
-    "crypto", "bitcoin", "trading", "stock", "finance", "bourse", "investment"
-]
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -26,8 +18,6 @@ def send_telegram_message(message):
     response = requests.post(url, json=payload)
     if response.status_code != 200:
         print(f"Erreur Telegram: {response.text}")
-    else:
-        print("Message envoyé avec succès !")
 
 def get_github_trending():
     url = "https://github.com/trending"
@@ -54,30 +44,67 @@ def get_github_trending():
         stars_tag = article.select_one('span.d-inline-block.float-sm-right')
         stars_text = stars_tag.text.strip() if stars_tag else "0 stars"
 
-        # Filtrage par mots-clés
-        text_to_check = (repo_name + " " + repo_desc).lower()
-        is_relevant = any(keyword in text_to_check for keyword in TARGET_KEYWORDS)
-
-        if is_relevant:
-            repos.append({
-                "name": repo_name,
-                "url": repo_url,
-                "desc": repo_desc,
-                "stars": stars_text
-            })
+        repos.append({
+            "name": repo_name,
+            "url": repo_url,
+            "desc": repo_desc,
+            "stars": stars_text
+        })
 
     return repos
 
-def main():
-    print("Recherche des pépites GitHub ciblées...")
-    repos = get_github_trending()
+def evaluate_with_jev(repo_text):
+    """Interroge Jev via OpenRouter pour scorer le repo"""
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    prompt = f"""
+    Analyse ce projet GitHub et réponds par un score de pertinence entre 0 et 100 pour un business/développeur spécialisé en IA, automatisation, SaaS, API et Crypto.
+    Projet : {repo_text}
+    Donne uniquement le score numérique (ex: 95).
+    """
+    
+    payload = {
+        "model": "typesafe/jev-1.14",  # Nom du modèle Jev sur OpenRouter (à ajuster si besoin selon l'exact ID OpenRouter)
+        "messages": [{"role": "user", "content": prompt}]
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        res_json = response.json()
+        score_text = res_json['choices'][0]['message']['content'].strip()
+        # Extrait les chiffres du score
+        score = int(''.join(filter(str.isdigit, score_text)))
+        return score
+    except Exception as e:
+        print(f"Erreur Jev/OpenRouter: {e}")
+        return 50  # Score par défaut en cas d'erreur
 
-    if not repos:
-        message = "🔍 *GitHub Business Gems* \nAujourd'hui, aucun repo tendance ne correspond à tes critères. On retente au prochain run !"
+def main():
+    print("Recherche et analyse des pépites avec Jev...")
+    repos = get_github_trending()
+    
+    scored_repos = []
+    for repo in repos:
+        combined_text = f"{repo['name']} : {repo['desc']}"
+        score = evaluate_with_jev(combined_text)
+        repo['score'] = score
+        # On ne garde que ceux qui ont un score supérieur à 60 par exemple
+        if score >= 60:
+            scored_repos.append(repo)
+
+    # Tri par score du plus haut au plus bas
+    scored_repos = sorted(scored_repos, key=lambda x: x['score'], reverse=True)
+
+    if not scored_repos:
+        message = "🔍 *GitHub Business Gems (Jev)* \nAucun repo pertinent trouvé pour ce run."
     else:
-        message = "🔥 *GitHub Business Gems (Top 12 Ciblé)*\n\n"
-        for i, repo in enumerate(repos[:12], 1):
-            message += f"*{i}. {repo['name']}* ({repo['stars']})\n"
+        message = "🔥 *GitHub Business Gems (Noté par Jev)*\n\n"
+        for i, repo in enumerate(scored_repos[:12], 1):
+            message += f"*{i}. {repo['name']}* (Score Jev: {repo['score']}/100 - {repo['stars']})\n"
             message += f"{repo['desc']}\n"
             message += f"👉 {repo['url']}\n\n"
 
