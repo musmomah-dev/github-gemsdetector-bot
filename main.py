@@ -72,11 +72,11 @@ def main():
     print("Recherche des pépites GitHub ciblées...")
     repos = get_github_trending()
 
-    if not repos:
-        message = "🔍 *GitHub Business Gems* \nAujourd'hui, aucun repo tendance ne correspond à tes critères. On retente demain !"
+        if not repos:
+        message = "🔍 *GitHub Business Gems* \nAujourd'hui, aucun repo tendance ne correspond à tes critères. On retente au prochain run !"
     else:
-        message = "🔥 *GitHub Business Gems (Sélection Ciblée)*\n\n"
-        for i, repo in enumerate(repos[:5], 1):
+        message = "🔥 *GitHub Business Gems (Top 12 Ciblé)*\n\n"
+        for i, repo in enumerate(repos[:12], 1):  # <-- On est passé à 12 max ici !
             message += f"*{i}. {repo['name']}* ({repo['stars']})\n"
             message += f"{repo['desc']}\n"
             message += f"👉 {repo['url']}\n\n"
