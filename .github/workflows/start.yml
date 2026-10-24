@@ -3,7 +3,7 @@ name: Telegram Bot
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 8 * * *'
+    - cron: '0 8,14,20 * * *'  # Tourne à 8h, 14h et 20h UTC (ce qui fait environ 10h, 16h et 22h en Tunisie)
 
 jobs:
   run:
