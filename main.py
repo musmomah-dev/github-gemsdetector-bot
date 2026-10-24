@@ -62,26 +62,27 @@ def evaluate_with_jev(repo_text):
     }
     
     prompt = f"""
-    Analyse ce projet GitHub et réponds par un score de pertinence entre 0 et 100 pour un business/développeur spécialisé en IA, automatisation, SaaS, API et Crypto.
+    Analyse ce projet GitHub et réponds par un score de pertinence entre 0 et 100 pour un business spécialisé en IA, automatisation, SaaS et API.
     Projet : {repo_text}
     Donne uniquement le score numérique (ex: 95).
     """
     
     payload = {
-        "model": "typesafe/jev-1.14",  # Nom du modèle Jev sur OpenRouter (à ajuster si besoin selon l'exact ID OpenRouter)
+        "model": "typesafe/jev-1.14",
         "messages": [{"role": "user", "content": prompt}]
     }
     
     try:
         response = requests.post(url, headers=headers, json=payload)
         res_json = response.json()
+        print(f"Réponse brute OpenRouter/Jev : {res_json}") # <-- DEBUG ICI
+        
         score_text = res_json['choices'][0]['message']['content'].strip()
-        # Extrait les chiffres du score
         score = int(''.join(filter(str.isdigit, score_text)))
         return score
     except Exception as e:
-        print(f"Erreur Jev/OpenRouter: {e}")
-        return 50  # Score par défaut en cas d'erreur
+        print(f"Erreur Jev/OpenRouter: {e} - Réponse complète : {response.text}")
+        return 0  # On met 0 pour voir s'il y a une erreur
 
 def main():
     print("Recherche et analyse des pépites avec Jev...")
