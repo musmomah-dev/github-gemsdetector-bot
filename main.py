@@ -53,8 +53,8 @@ def get_github_trending():
 
     return repos
 
-def evaluate_with_jev(repo_text):
-    """Interroge Jev via OpenRouter pour scorer le repo"""
+def evaluate_with_claude(repo_text):
+    """Interroge Claude Haiku 5.5 via OpenRouter pour scorer le repo"""
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -62,50 +62,48 @@ def evaluate_with_jev(repo_text):
     }
     
     prompt = f"""
-    Analyse ce projet GitHub et réponds par un score de pertinence entre 0 et 100 pour un business spécialisé en IA, automatisation, SaaS et API.
+    Analyse ce projet GitHub et attribue-lui un score de pertinence entre 0 et 100 pour un business/développeur spécialisé en IA, automatisation, SaaS, API et Crypto.
     Projet : {repo_text}
-    Donne uniquement le score numérique (ex: 95).
+    Réponds UNIQUEMENT avec un nombre entier (ex: 85). Pas de texte autour.
     """
     
     payload = {
-        "model": "typesafe/jev-1.14",
+        "model": "anthropic/claude-haiku-5.5",
         "messages": [{"role": "user", "content": prompt}]
     }
     
     try:
         response = requests.post(url, headers=headers, json=payload)
         res_json = response.json()
-        print(f"Réponse brute OpenRouter/Jev : {res_json}") # <-- DEBUG ICI
-        
         score_text = res_json['choices'][0]['message']['content'].strip()
         score = int(''.join(filter(str.isdigit, score_text)))
         return score
     except Exception as e:
-        print(f"Erreur Jev/OpenRouter: {e} - Réponse complète : {response.text}")
-        return 0  # On met 0 pour voir s'il y a une erreur
+        print(f"Erreur Claude/OpenRouter: {e}")
+        return 50
 
 def main():
-    print("Recherche et analyse des pépites avec Jev...")
+    print("Recherche et analyse des pépites avec Claude Haiku 5.5...")
     repos = get_github_trending()
     
     scored_repos = []
     for repo in repos:
         combined_text = f"{repo['name']} : {repo['desc']}"
-        score = evaluate_with_jev(combined_text)
+        score = evaluate_with_claude(combined_text)
         repo['score'] = score
-        # On ne garde que ceux qui ont un score supérieur à 60 par exemple
-        if score >= 60:
+        # On garde les projets avec un score de pertinence intéressant (ex: >= 50)
+        if score >= 50:
             scored_repos.append(repo)
 
     # Tri par score du plus haut au plus bas
     scored_repos = sorted(scored_repos, key=lambda x: x['score'], reverse=True)
 
     if not scored_repos:
-        message = "🔍 *GitHub Business Gems (Jev)* \nAucun repo pertinent trouvé pour ce run."
+        message = "🔍 *GitHub Business Gems (Claude)* \nAucun repo pertinent trouvé pour ce run."
     else:
-        message = "🔥 *GitHub Business Gems (Noté par Jev)*\n\n"
+        message = "🔥 *GitHub Business Gems (Noté par Claude Haiku 5.5)*\n\n"
         for i, repo in enumerate(scored_repos[:12], 1):
-            message += f"*{i}. {repo['name']}* (Score Jev: {repo['score']}/100 - {repo['stars']})\n"
+            message += f"*{i}. {repo['name']}* (Score: {repo['score']}/100 - {repo['stars']})\n"
             message += f"{repo['desc']}\n"
             message += f"👉 {repo['url']}\n\n"
 
